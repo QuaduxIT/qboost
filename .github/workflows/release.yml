@@ -31,7 +31,7 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # Die Windows-Laeufer bringen Visual Studio mit C++-Werkzeugen und das
       # Windows SDK bereits mit - es ist keine zusaetzliche Einrichtung noetig.
@@ -47,7 +47,7 @@ jobs:
           '{0} ({1:N0} Bytes)' -f $msi, (Get-Item $msi).Length
 
       # Auch ohne Tag verfuegbar, damit ein Testlauf etwas hinterlaesst.
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: QuaduxBoost-msi
           path: dist/QuaduxBoost.msi
