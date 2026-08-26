@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  @license Apache-2.0
+  Copyright © 2026 Quadux IT GmbH
+     ____                  __              __________   ______          __    __  __
+    / __ \__  ______ _____/ /_  ___  __   /  _/_  __/  / ____/___ ___  / /_  / / / /
+   / / / / / / / __ `/ __  / / / / |/_/   / /  / /    / / __/ __ `__ \/ __ \/ /_/ /
+  / /_/ / /_/ / /_/ / /_/ / /_/ />  <   _/ /  / /    / /_/ / / / / / / /_/ / __  /
+  \___\_\__,_/\__,_/\__,_/\__,_/_/|_|  /___/ /_/     \____/_/ /_/ /_/_.___/_/ /_/
+
+  qboost
+  Author: Walter Hoffmann
+-->
+<!--
+  QuaduxBoost.wxs - Paketdefinition fuer das Installationspaket (WiX v3).
+
+  Das MSI ist bewusst schlank: es legt nur zwei Dateien ab und ueberlaesst die
+  eigentliche Einrichtung dem Programm selbst (qboost-cli install). Das haelt
+  die gesamte Logik - Registrierung, Effektkette, Sicherung, Messung, Rueckbau -
+  an EINER Stelle und nicht halb im Installer verstreut.
+
+  Beide Dateien liegen in %ProgramFiles%\QuaduxBoost\; dieses Verzeichnis wird
+  in den System-PATH aufgenommen, damit "qboost-cli" ueberall aufrufbar ist.
+  (Nach System32 zu kopieren waere zwar auch "im Pfad", ist aber
+  Windows-eigenen Komponenten vorbehalten und erschwert den sauberen Rueckbau.)
+
+-->
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+
+  <Product Id="*"
+           Name="Quadux Boost"
+           Language="1031"
+           Version="1.0.0.0"
+           Manufacturer="Quadux IT"
+           UpgradeCode="A975CAB6-6470-417B-9D6D-C29EBB5491EF">
+
+    <Package InstallerVersion="500"
+             Compressed="yes"
+             InstallScope="perMachine"
+             Platform="x64"
+             Manufacturer="Quadux IT"
+             Description="Systemweiter Lautstaerke-Verstaerker (Audio Processing Object)"
+             Comments="Hebt den Wiedergabepegel ueber 100 Prozent. Apache-2.0." />
+
+    <MajorUpgrade DowngradeErrorMessage="Es ist bereits eine neuere Version von Quadux Boost installiert." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <!-- Windows 7 oder neuer; die APO-Schnittstellen setzen das voraus. -->
+    <Condition Message="Quadux Boost benoetigt Windows 7 oder neuer.">
+      <![CDATA[Installed OR VersionNT >= 601]]>
+    </Condition>
+    <Condition Message="Quadux Boost benoetigt ein 64-Bit-Windows.">
+      <![CDATA[Installed OR VersionNT64]]>
+    </Condition>
+
+    <!-- ================= Verzeichnisse ================= -->
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="ProgramFiles64Folder">
+        <Directory Id="INSTALLFOLDER" Name="QuaduxBoost" />
+      </Directory>
+    </Directory>
+
+    <!-- ================= Dateien ================= -->
+    <ComponentGroup Id="QuaduxBoostFiles">
+
+      <Component Id="CompApoDll" Directory="INSTALLFOLDER"
+                 Guid="09709EC3-81BE-4A78-AF80-EB6F35AEC85D" Win64="yes">
+        <File Id="FileApoDll"
+              Name="QuaduxBoostApo.dll"
+              Source="$(var.ApoDll)"
+              KeyPath="yes" />
+      </Component>
+
+      <Component Id="CompCli" Directory="INSTALLFOLDER"
+                 Guid="8CE74F57-9423-4884-A275-BD132ED6EC1D" Win64="yes">
+        <File Id="FileCli"
+              Name="qboost-cli.exe"
+              Source="$(var.CliExe)"
+              KeyPath="yes" />
+        <!-- Installationsordner in den System-PATH aufnehmen; beim Entfernen
+             wird der Eintrag wieder ausgetragen (Permanent="no"). -->
+        <Environment Id="PathEntry"
+                     Name="PATH"
+                     Value="[INSTALLFOLDER]"
+                     Part="last"
+                     Action="set"
+                     System="yes"
+                     Permanent="no" />
+      </Component>
+
+    </ComponentGroup>
+
+    <Feature Id="Main" Title="Quadux Boost" Level="1" Absent="disallow">
+      <ComponentGroupRef Id="QuaduxBoostFiles" />
+    </Feature>
+
+    <!-- ================= Einrichtung ================= -->
+    <!--
+      Typ-34-Aktionen (Verzeichnis + Kommandozeile). Deferred + Impersonate=no,
+      damit sie mit Systemrechten laufen - noetig fuer Registry und Dienste.
+
+      Beim Einrichten laeuft alles in Sitzung 0; dort erreicht der Testton die
+      Lautsprecher nicht. qboost-cli erkennt das und wertet es NICHT als
+      Fehlschlag (Rueckgabe 0), sondern bittet um 'qboost-cli selftest' in einer
+      normalen Sitzung. Deshalb ist Return="check" hier unbedenklich.
+    -->
+    <CustomAction Id="QbInstall"
+                  Directory="INSTALLFOLDER"
+                  ExeCommand="&quot;[INSTALLFOLDER]qboost-cli.exe&quot; install"
+                  Execute="deferred"
+                  Impersonate="no"
+                  Return="check" />
+
+    <!-- Beim Entfernen: Effektkette zurueckbauen, SOLANGE die Dateien noch da sind. -->
+    <CustomAction Id="QbUninstall"
+                  Directory="INSTALLFOLDER"
+                  ExeCommand="&quot;[INSTALLFOLDER]qboost-cli.exe&quot; uninstall"
+                  Execute="deferred"
+                  Impersonate="no"
+                  Return="ignore" />
+
+    <InstallExecuteSequence>
+      <Custom Action="QbUninstall" Before="RemoveFiles">
+        <![CDATA[REMOVE~="ALL"]]>
+      </Custom>
+      <Custom Action="QbInstall" After="InstallFiles">
+        <![CDATA[NOT REMOVE]]>
+      </Custom>
+    </InstallExecuteSequence>
+
+  </Product>
+</Wix>

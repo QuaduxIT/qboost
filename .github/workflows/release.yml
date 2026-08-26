@@ -1,0 +1,64 @@
+# @license Apache-2.0
+# Copyright © 2026 Quadux IT GmbH
+#    ____                  __              __________   ______          __    __  __
+#   / __ \__  ______ _____/ /_  ___  __   /  _/_  __/  / ____/___ ___  / /_  / / / /
+#  / / / / / / / __ `/ __  / / / / |/_/   / /  / /    / / __/ __ `__ \/ __ \/ /_/ /
+# / /_/ / /_/ / /_/ / /_/ / /_/ />  <   _/ /  / /    / /_/ / / / / / / /_/ / __  /
+# \___\_\__,_/\__,_/\__,_/\__,_/_/|_|  /___/ /_/     \____/_/ /_/ /_/_.___/_/ /_/
+#
+# qboost
+# Author: Walter Hoffmann
+# Baut das Installationspaket und haengt es an ein GitHub-Release.
+#
+# Ausgeloest durch einen Versions-Tag:
+#   git tag v1.0.0 && git push origin v1.0.0
+#
+# Das MSI liegt bewusst NICHT im Repository - es entsteht hier reproduzierbar
+# aus den Quellen. WiX laedt das Bauskript selbst nach.
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:        # erlaubt einen Testlauf ohne Tag
+
+permissions:
+  contents: write           # noetig, um das Release anzulegen
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Die Windows-Laeufer bringen Visual Studio mit C++-Werkzeugen und das
+      # Windows SDK bereits mit - es ist keine zusaetzliche Einrichtung noetig.
+      - name: Paket bauen
+        shell: pwsh
+        run: .\msi\build-msi.ps1
+
+      - name: Ergebnis pruefen
+        shell: pwsh
+        run: |
+          $msi = 'dist\QuaduxBoost.msi'
+          if (-not (Test-Path $msi)) { throw 'MSI wurde nicht erzeugt.' }
+          '{0} ({1:N0} Bytes)' -f $msi, (Get-Item $msi).Length
+
+      # Auch ohne Tag verfuegbar, damit ein Testlauf etwas hinterlaesst.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: QuaduxBoost-msi
+          path: dist/QuaduxBoost.msi
+
+      - name: Release anlegen
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ github.ref_name }}" `
+            dist/QuaduxBoost.msi `
+            --title "Quadux Boost ${{ github.ref_name }}" `
+            --generate-notes

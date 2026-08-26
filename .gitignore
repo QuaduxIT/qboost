@@ -1,0 +1,19 @@
+# Build-Artefakte
+build/
+build-diag/
+*.obj
+*.exp
+*.lib
+*.pdb
+*.ilk
+_build.bat
+
+# Editor
+.vs/
+*.user
+
+# WiX-Binaerpaket (wird von build-msi.ps1 bei Bedarf geladen) und Zwischenstand
+msi/wix/
+msi/obj/
+# Fertiges Paket: gehoert nicht in die Historie, sondern an ein Release
+dist/
